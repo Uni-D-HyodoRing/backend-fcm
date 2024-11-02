@@ -21,6 +21,10 @@ admin.initializeApp({
 
 // FCM 메시지 전송을 위한 유틸리티 클래스
 class FCMService {
+  constructor() {
+    // 토큰 구독자 저장
+    this.subscribers = new Set();
+  }
   // 단일 기기로 메시지 전송
   async sendToDevice(token, title, body, data = {}) {
     try {
@@ -99,4 +103,6 @@ class FCMService {
   }
 }
 
-export default new FCMService();
+// FCM 서비스 인스턴스 생성 및 내보내기
+const fcmService = new FCMService();
+export default fcmService;

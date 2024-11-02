@@ -1,9 +1,35 @@
 // Firebase Admin SDK 초기화 및 Express 설정
 import express from "express";
 import FCMService from "./firebase.js";
+import cors from "cors";
 
 const app = express();
-app.use(express.json());
+// CORS 설정 추가
+app.use(
+  cors({
+    origin: process.env.ALLOWED_ORIGINS?.split(",") || "*", // 허용할 출처 설정
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
+
+app.get("/api/notifications/subscribe", async (req, res) => {
+  // 쿼리 파라미터에서 token 추출
+  const token = req.query.token;
+
+  if (!token) {
+    return res.status(400).json({
+      success: false,
+      error: "token is required",
+    });
+  }
+
+  console.log("Received token:", token);
+
+  FCMService.subscribers.add(token);
+  res.json({ success: true, message: "Successfully subscribed" });
+});
 
 app.post("/api/notifications/send", async (req, res) => {
   const { token, title, body, data } = req.body;
@@ -15,7 +41,6 @@ app.post("/api/notifications/send", async (req, res) => {
     });
   }
 
-  // FCMService 인스턴스 메서드로 호출
   const result = await FCMService.sendToDevice(token, title, body, data);
 
   if (result.success) {
@@ -82,7 +107,7 @@ app.post("/api/notifications/subscribe-to-topic", async (req, res) => {
   }
 
   try {
-    await FCMService.admin.messaging().subscribeToTopic(token, topic);
+    await admin.messaging().subscribeToTopic(token, topic);
     res.json({ success: true, message: "Successfully subscribed to topic" });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -101,7 +126,7 @@ app.post("/api/notifications/unsubscribe-from-topic", async (req, res) => {
   }
 
   try {
-    await FCMService.admin.messaging().unsubscribeFromTopic(token, topic);
+    await admin.messaging().unsubscribeFromTopic(token, topic);
     res.json({
       success: true,
       message: "Successfully unsubscribed from topic",
