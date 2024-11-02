@@ -1,0 +1,23 @@
+{
+  "name": "backend-fcm",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Uni-D-zfsdf/backend-fcm.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Uni-D-zfsdf/backend-fcm/issues"
+  },
+  "homepage": "https://github.com/Uni-D-zfsdf/backend-fcm#readme",
+  "dependencies": {
+    "express": "^4.21.1"
+  }
+}
