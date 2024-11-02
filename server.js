@@ -25,14 +25,14 @@ app.get("/api/notifications/subscribe", async (req, res) => {
     });
   }
 
-  console.log("Received token:", token);
+  console.log("Received token:", member_id, token);
 
   FCMService.subscribers.set(member_id, token);
   res.json({ success: true, message: "Successfully subscribed" });
 });
 
 app.post("/api/notifications", async (req, res) => {
-  const { member_id, title, body, data } = req.body;
+  const { member_id, title, body } = req.body;
   const token = FCMService.subscribers.get(member_id);
   if (!token) {
     return res.status(400).json({
@@ -40,7 +40,7 @@ app.post("/api/notifications", async (req, res) => {
       error: "token is required",
     });
   }
-  const result = await FCMService.sendToDevice(token, title, body, data);
+  const result = await FCMService.sendToDevice(token, title, body);
   res.json(result);
 });
 
