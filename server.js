@@ -16,7 +16,7 @@ app.use(
 
 app.get("/api/notifications/subscribe", async (req, res) => {
   // 쿼리 파라미터에서 token 추출
-  const token = req.query.token;
+  const { token, member_id } = req.query;
 
   if (!token) {
     return res.status(400).json({
@@ -27,52 +27,21 @@ app.get("/api/notifications/subscribe", async (req, res) => {
 
   console.log("Received token:", token);
 
-  FCMService.subscribers.add(token);
+  FCMService.subscribers.set(member_id, token);
   res.json({ success: true, message: "Successfully subscribed" });
 });
 
-app.post("/api/notifications/send", async (req, res) => {
-  const { token, title, body, data } = req.body;
-
-  if (!token || !title || !body) {
+app.post("/api/notifications", async (req, res) => {
+  const { member_id, title, body, data } = req.body;
+  const token = FCMService.subscribers.get(member_id);
+  if (!token) {
     return res.status(400).json({
       success: false,
-      error: "token, title, and body are required",
+      error: "token is required",
     });
   }
-
   const result = await FCMService.sendToDevice(token, title, body, data);
-
-  if (result.success) {
-    res.json(result);
-  } else {
-    res.status(500).json(result);
-  }
-});
-
-// 여러 기기로 푸시 알림 전송
-app.post("/api/notifications/send-multiple", async (req, res) => {
-  const { tokens, title, body, data } = req.body;
-
-  if (!tokens || !Array.isArray(tokens) || !title || !body) {
-    return res.status(400).json({
-      success: false,
-      error: "tokens array, title, and body are required",
-    });
-  }
-
-  const result = await FCMService.sendToMultipleDevices(
-    tokens,
-    title,
-    body,
-    data
-  );
-
-  if (result.success) {
-    res.json(result);
-  } else {
-    res.status(500).json(result);
-  }
+  res.json(result);
 });
 
 // 토픽으로 푸시 알림 전송

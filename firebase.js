@@ -23,7 +23,7 @@ admin.initializeApp({
 class FCMService {
   constructor() {
     // 토큰 구독자 저장
-    this.subscribers = new Set();
+    this.subscribers = new Map();
   }
   // 단일 기기로 메시지 전송
   async sendToDevice(token, title, body, data = {}) {
