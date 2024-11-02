@@ -1,19 +1,118 @@
-const express = require("express");
+// Firebase Admin SDK 초기화 및 Express 설정
+import express from "express";
+import FCMService from "./firebase.js";
 
 const app = express();
-const portnum = 8082;
+app.use(express.json());
 
-// HTTP Server
-app.get("/", (req, res) => {
-    res.send(`<h1>Main Page</h1>`);
+app.post("/api/notifications/send", async (req, res) => {
+  const { token, title, body, data } = req.body;
+
+  if (!token || !title || !body) {
+    return res.status(400).json({
+      success: false,
+      error: "token, title, and body are required",
+    });
+  }
+
+  // FCMService 인스턴스 메서드로 호출
+  const result = await FCMService.sendToDevice(token, title, body, data);
+
+  if (result.success) {
+    res.json(result);
+  } else {
+    res.status(500).json(result);
+  }
 });
 
-// 404 Error Handler
-app.use(function (req, res, next) {
-    res.status(404).send("404 Error: Page Not Found");
+// 여러 기기로 푸시 알림 전송
+app.post("/api/notifications/send-multiple", async (req, res) => {
+  const { tokens, title, body, data } = req.body;
+
+  if (!tokens || !Array.isArray(tokens) || !title || !body) {
+    return res.status(400).json({
+      success: false,
+      error: "tokens array, title, and body are required",
+    });
+  }
+
+  const result = await FCMService.sendToMultipleDevices(
+    tokens,
+    title,
+    body,
+    data
+  );
+
+  if (result.success) {
+    res.json(result);
+  } else {
+    res.status(500).json(result);
+  }
 });
 
-// Start Server on Port ${portnum}
-app.listen(portnum, () => {
-    console.log("Listening on " + portnum);
+// 토픽으로 푸시 알림 전송
+app.post("/api/notifications/send-topic", async (req, res) => {
+  const { topic, title, body, data } = req.body;
+
+  if (!topic || !title || !body) {
+    return res.status(400).json({
+      success: false,
+      error: "topic, title, and body are required",
+    });
+  }
+
+  const result = await FCMService.sendToTopic(topic, title, body, data);
+
+  if (result.success) {
+    res.json(result);
+  } else {
+    res.status(500).json(result);
+  }
+});
+
+// 토픽 구독 관리
+app.post("/api/notifications/subscribe-to-topic", async (req, res) => {
+  const { token, topic } = req.body;
+
+  if (!token || !topic) {
+    return res.status(400).json({
+      success: false,
+      error: "token and topic are required",
+    });
+  }
+
+  try {
+    await FCMService.admin.messaging().subscribeToTopic(token, topic);
+    res.json({ success: true, message: "Successfully subscribed to topic" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 토픽 구독 해제
+app.post("/api/notifications/unsubscribe-from-topic", async (req, res) => {
+  const { token, topic } = req.body;
+
+  if (!token || !topic) {
+    return res.status(400).json({
+      success: false,
+      error: "token and topic are required",
+    });
+  }
+
+  try {
+    await FCMService.admin.messaging().unsubscribeFromTopic(token, topic);
+    res.json({
+      success: true,
+      message: "Successfully unsubscribed from topic",
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 서버 시작
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
