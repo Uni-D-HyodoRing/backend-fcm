@@ -1,22 +1,109 @@
-// Firebase Admin SDK 초기화 및 Express 설정
 import express from "express";
 import FCMService from "./firebase.js";
 import cors from "cors";
+import swaggerUi from "swagger-ui-express";
+import swaggerJsdoc from "swagger-jsdoc";
 
 const app = express();
-// CORS 설정 추가
+
+// Swagger 설정
+const swaggerOptions = {
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "FCM Push Notification API",
+      version: "1.0.0",
+      description: "Firebase Cloud Messaging을 이용한 푸시 알림 서비스 API",
+    },
+    servers: [
+      {
+        url: "http://localhost:3000",
+        description: "개발 서버",
+      },
+    ],
+    components: {
+      schemas: {
+        SuccessResponse: {
+          type: "object",
+          properties: {
+            success: {
+              type: "boolean",
+              example: true,
+            },
+            message: {
+              type: "string",
+            },
+          },
+        },
+        ErrorResponse: {
+          type: "object",
+          properties: {
+            success: {
+              type: "boolean",
+              example: false,
+            },
+            error: {
+              type: "string",
+            },
+          },
+        },
+      },
+    },
+  },
+  apis: ["./server.js"],
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+app.use(express.json());
 app.use(
   cors({
-    origin: process.env.ALLOWED_ORIGINS?.split(",") || "*", // 허용할 출처 설정
+    origin: process.env.ALLOWED_ORIGINS?.split(",") || "*",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
 
-app.get("/api/notifications/subscribe", async (req, res) => {
-  // 쿼리 파라미터에서 token 추출
-  const { token, member_id } = req.query;
+/**
+ * @swagger
+ * /api/notifications/subscribe:
+ *   post:
+ *     summary: FCM 토큰 등록
+ *     tags: [Notifications]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *               - member_id
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: FCM 디바이스 토큰
+ *               member_id:
+ *                 type: integer
+ *                 description: 사용자 ID
+ *     responses:
+ *       200:
+ *         description: 토큰 등록 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       400:
+ *         description: 잘못된 요청
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+app.post("/api/notifications/subscribe", async (req, res) => {
+  const { token, member_id } = req.body;
 
   if (!token) {
     return res.status(400).json({
@@ -31,6 +118,52 @@ app.get("/api/notifications/subscribe", async (req, res) => {
   res.json({ success: true, message: "Successfully subscribed" });
 });
 
+/**
+ * @swagger
+ * /api/notifications:
+ *   post:
+ *     summary: 푸시 알림 전송
+ *     tags: [Notifications]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - member_id
+ *               - title
+ *               - body
+ *             properties:
+ *               member_id:
+ *                 type: integer
+ *                 description: 알림을 받을 사용자 ID
+ *               title:
+ *                 type: string
+ *                 description: 알림 제목
+ *               body:
+ *                 type: string
+ *                 description: 알림 내용
+ *     responses:
+ *       200:
+ *         description: 알림 전송 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 response:
+ *                   type: string
+ *       400:
+ *         description: 잘못된 요청 (토큰이 없는 경우)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 app.post("/api/notifications", async (req, res) => {
   const { member_id, title, body } = req.body;
   const token = FCMService.subscribers.get(member_id);
@@ -44,69 +177,8 @@ app.post("/api/notifications", async (req, res) => {
   res.json(result);
 });
 
-// 토픽으로 푸시 알림 전송
-app.post("/api/notifications/send-topic", async (req, res) => {
-  const { topic, title, body, data } = req.body;
-
-  if (!topic || !title || !body) {
-    return res.status(400).json({
-      success: false,
-      error: "topic, title, and body are required",
-    });
-  }
-
-  const result = await FCMService.sendToTopic(topic, title, body, data);
-
-  if (result.success) {
-    res.json(result);
-  } else {
-    res.status(500).json(result);
-  }
-});
-
-// 토픽 구독 관리
-app.post("/api/notifications/subscribe-to-topic", async (req, res) => {
-  const { token, topic } = req.body;
-
-  if (!token || !topic) {
-    return res.status(400).json({
-      success: false,
-      error: "token and topic are required",
-    });
-  }
-
-  try {
-    await admin.messaging().subscribeToTopic(token, topic);
-    res.json({ success: true, message: "Successfully subscribed to topic" });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// 토픽 구독 해제
-app.post("/api/notifications/unsubscribe-from-topic", async (req, res) => {
-  const { token, topic } = req.body;
-
-  if (!token || !topic) {
-    return res.status(400).json({
-      success: false,
-      error: "token and topic are required",
-    });
-  }
-
-  try {
-    await admin.messaging().unsubscribeFromTopic(token, topic);
-    res.json({
-      success: true,
-      message: "Successfully unsubscribed from topic",
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// 서버 시작
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  console.log(`Swagger UI available at http://localhost:${PORT}/api-docs`);
 });
